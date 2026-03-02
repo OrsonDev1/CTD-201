@@ -96,6 +96,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     setupSlider(inputGainSlider, inputGainLabel, "Input Gain", "inputGain");
     addAndMakeVisible(peakLed);
+    addAndMakeVisible (vuMeter);
     startTimerHz(30); // Start the LED update timer
 
     // --- Effect knobs ---
@@ -178,13 +179,20 @@ void PluginEditor::paint(juce::Graphics& g)
     // 3. Draw Section Dividers (Lines)
     g.setColour(juce::Colours::black.withAlpha(0.3f));
 
-    // The line now draws all the way to the bottom (faceplate.getBottom() - 10.0f)
-    g.drawLine(170.0f, faceplate.getY() + 10.0f, 170.0f, faceplate.getBottom() - 10.0f, 1.0f);
+    // Calculate exactly where the equal column boundaries are
+    float colWidth = (getWidth() - 40) / 5.0f;
+    float line1X = 20.0f + colWidth;
+    float line2X = 20.0f + (colWidth * 2.0f);
 
+    // Line 1: Between Input section and Heads section
+    g.drawLine(line1X, faceplate.getY() + 10.0f, line1X, faceplate.getBottom() - 10.0f, 1.0f);
+
+    // Line 2: Between Heads section and the Main Effects Grid
+    g.drawLine(line2X, faceplate.getY() + 10.0f, line2X, faceplate.getBottom() - 10.0f, 1.0f);
     // 4. Title
     g.setColour(juce::Colours::black);
     g.setFont(24.0f);
-    g.drawText("Cosmic Tape Delay 201 Version 0.9.2 Beta", area.removeFromTop(40), juce::Justification::centred, false);
+    g.drawText("Cosmic Tape Delay 201 Version 0.9.3", area.removeFromTop(40), juce::Justification::centred, false);
 }
 
 void PluginEditor::resized()
@@ -192,110 +200,121 @@ void PluginEditor::resized()
     auto area = getLocalBounds().reduced(20);
     area.removeFromTop(40); // Skip title
 
-    // --- 1. LEFT COLUMN (Now spans the entire height of the UI) ---
-    auto leftCol = area.removeFromLeft(150);
-    int buttonHeight = 35;
-    int startY = leftCol.getY() + 15;
+    // Divide the usable width perfectly into 5 equal columns
+    int colWidth = area.getWidth() / 5;
+
+    // --- 1. FAR LEFT COL: VU, Input, Output & Utilities ---
+    auto col1 = area.removeFromLeft(colWidth);
+
+    // Padding the VU meter so it stays a nice analog shape
+    vuMeter.setBounds(col1.removeFromTop(100).reduced(15, 5));
+    col1.removeFromTop(10); // Spacing
+
+    // Input Gain + LED
+    auto gainLabelRow = col1.removeFromTop(20);
+    inputGainLabel.setBounds(gainLabelRow);
+    peakLed.setBounds(gainLabelRow.getRight() - 35, gainLabelRow.getY() + 2, 15, 15);
+    inputGainSlider.setBounds(col1.removeFromTop(75));
+
+    col1.removeFromTop(10); // Gap
+
+    // Output Gain
+    masterGainLabel.setBounds(col1.removeFromTop(20));
+    masterGainSlider.setBounds(col1.removeFromTop(75));
+
+    col1.removeFromTop(20); // Slightly larger gap before buttons now that we have space
+
+    int btnH = 28;
+    int btnGap = 8;
+
+    // Only Bypass and Kill Dry live here now
+    bypassButton.setBounds(col1.removeFromTop(btnH).reduced(15, 0));
+    col1.removeFromTop(btnGap);
+    killDryButton.setBounds(col1.removeFromTop(btnH).reduced(15, 0));
+
+    // --- 2. MIDDLE COL: Heads, Delay Time, Sync & Reset ---
+    auto col2 = area.removeFromLeft(colWidth);
+    col2.removeFromTop(10); // Push heads down slightly to align with the VU meter center
 
     // Heads
-    head1Button.setBounds(leftCol.getX() + 10, startY, 100, buttonHeight);
-    head2Button.setBounds(leftCol.getX() + 10, startY + 45, 100, buttonHeight);
-    head3Button.setBounds(leftCol.getX() + 10, startY + 90, 100, buttonHeight);
+    head1Button.setBounds(col2.removeFromTop(btnH).reduced(15, 0));
+    col2.removeFromTop(btnGap);
+    head2Button.setBounds(col2.removeFromTop(btnH).reduced(15, 0));
+    col2.removeFromTop(btnGap);
+    head3Button.setBounds(col2.removeFromTop(btnH).reduced(15, 0));
+
+    col2.removeFromTop(20); // Gap
+
+    // Delay Time
+    delayLabel.setBounds(col2.removeFromTop(20));
+    delayTimeSlider.setBounds(col2.removeFromTop(75));
+
+    col2.removeFromTop(20); // Gap
 
     // Tempo Sync
-    syncButton.setBounds(leftCol.getX() + 10, startY + 140, 100, buttonHeight);
-    syncRateBox.setBounds(leftCol.getX() + 10, startY + 180, 100, 25);
+    syncButton.setBounds(col2.removeFromTop(btnH).reduced(15, 0));
+    col2.removeFromTop(btnGap);
+    syncRateBox.setBounds(col2.removeFromTop(25).reduced(15, 0));
 
-    // Utilities
-    bypassButton.setBounds(leftCol.getX() + 10, startY + 230, 100, buttonHeight);
-    killDryButton.setBounds(leftCol.getX() + 10, startY + 275, 100, buttonHeight);
-    initButton.setBounds(leftCol.getX() + 10, startY + 320, 100, buttonHeight);
+    col2.removeFromTop(15); // Gap before Reset button
 
-    // Add a visual gap between the vertical line and the right-side controls
-    area.removeFromLeft(20);
+    // MOVED: Reset All button is now safely at the bottom of Col 2
+    initButton.setBounds(col2.removeFromTop(btnH).reduced(15, 0));
 
-    // --- 2. BOTTOM MIXER STRIP (Now only spans the right side) ---
-    auto bottomStrip = area.removeFromBottom(120);
-    int mixKnobWidth = bottomStrip.getWidth() / 5;
+    // --- 3. RIGHT SECTION: The 3x3 Effects Grid ---
+    auto gridCol1 = area.removeFromLeft(colWidth);
+    auto gridCol2 = area.removeFromLeft(colWidth);
+    auto gridCol3 = area; // Takes the remaining 5th slice
 
-    // 1. INPUT GAIN & LED
-    int col0 = bottomStrip.getX();
-    inputGainLabel.setBounds(col0, bottomStrip.getY(), mixKnobWidth, 20);
-    inputGainSlider.setBounds(col0, bottomStrip.getY() + 20, mixKnobWidth, 80);
-    peakLed.setBounds(col0 + mixKnobWidth - 30, bottomStrip.getY() + 10, 15, 15);
+    int kSize = 85;
 
-    // 2. ECHO MIX
-    int col1 = bottomStrip.getX() + mixKnobWidth;
-    echoMixLabel.setBounds(col1, bottomStrip.getY(), mixKnobWidth, 20);
-    echoMixSlider.setBounds(col1, bottomStrip.getY() + 20, mixKnobWidth, 80);
+    // Helper lambda to perfectly stack a label and a knob safely
+    auto placeKnob = [&](juce::Component& label, juce::Component& slider, juce::Rectangle<int>& bounds) {
+        label.setBounds(bounds.removeFromTop(20));
+        slider.setBounds(bounds.removeFromTop(75).withSizeKeepingCentre(kSize, kSize));
+        bounds.removeFromTop(15); // Row spacing
+    };
 
-    // 3. REVERB MIX
-    int col2 = bottomStrip.getX() + mixKnobWidth * 2;
-    reverbMixLabel.setBounds(col2, bottomStrip.getY(), mixKnobWidth, 20);
-    reverbMixSlider.setBounds(col2, bottomStrip.getY() + 20, mixKnobWidth, 80);
+    // Push the grid down slightly so the top row aligns horizontally with the Delay Time knob
+    gridCol1.removeFromTop(20);
+    gridCol2.removeFromTop(20);
+    gridCol3.removeFromTop(20);
 
-    int buttonY = reverbMixSlider.getBottom() + 5;
-    int loadBtnWidth = mixKnobWidth - 40;
-    loadIRButton.setBounds(col2 + 5, buttonY, loadBtnWidth, 20);
-    resetIRButton.setBounds(loadIRButton.getRight() + 5, buttonY, 25, 20);
+    // Grid Column 1 (Left): Feedback, Saturation, Echo Mix
+    placeKnob(feedbackLabel, feedbackSlider, gridCol1);
+    placeKnob(saturationLabel, saturationSlider, gridCol1);
+    gridCol1.removeFromTop(10); // Extra gap before mix row
+    placeKnob(echoMixLabel, echoMixSlider, gridCol1);
 
-    // 4. MASTER MIX
-    int col3 = bottomStrip.getX() + mixKnobWidth * 3;
-    masterMixLabel.setBounds(col3, bottomStrip.getY(), mixKnobWidth, 20);
-    masterMixSlider.setBounds(col3, bottomStrip.getY() + 20, mixKnobWidth, 80);
+    // Grid Column 2 (Center): Wow, Flutter, Reverb Mix
+    placeKnob(wowLabel, wowSlider, gridCol2);
+    placeKnob(flutterLabel, flutterSlider, gridCol2);
+    gridCol2.removeFromTop(10); // Extra gap before mix row
+    placeKnob(reverbMixLabel, reverbMixSlider, gridCol2);
 
-    // 5. MASTER GAIN
-    int col4 = bottomStrip.getX() + mixKnobWidth * 4;
-    masterGainLabel.setBounds(col4, bottomStrip.getY(), mixKnobWidth, 20);
-    masterGainSlider.setBounds(col4, bottomStrip.getY() + 20, mixKnobWidth, 80);
+    // IR Buttons tucked directly under Reverb Mix
+    int irBtnWidth = 70;
+    auto btnRow = gridCol2.removeFromTop(25).withSizeKeepingCentre(irBtnWidth + 30, 20);
+    loadIRButton.setBounds(btnRow.removeFromLeft(irBtnWidth));
+    btnRow.removeFromLeft(5);
+    resetIRButton.setBounds(btnRow.removeFromLeft(25));
 
-    // --- 3. MAIN EFFECTS GRID (Repacked for balance) ---
-    int knobSize = 90;
-    int spacing = 35; // Wider spacing to fill the new width
-    int vSpacing = 15;
-
-    int gridStartX = area.getX() + 10;
-    int gridStartY = area.getY() + 10;
-
-    // Pre-calculate column X positions
-    int x1 = gridStartX;
-    int x2 = x1 + knobSize + spacing;
-    int x3 = x2 + knobSize + spacing;
-    int x4 = x3 + knobSize + spacing;
-
-    // --- ROW 1: Delay | Feedback | Saturation ---
-    int row1Y = gridStartY;
-
-    delayLabel.setBounds(x1, row1Y, knobSize, 20);
-    delayTimeSlider.setBounds(x1, row1Y + 20, knobSize, knobSize);
-
-    feedbackLabel.setBounds(x2, row1Y, knobSize, 20);
-    feedbackSlider.setBounds(x2, row1Y + 20, knobSize, knobSize);
-
-    saturationLabel.setBounds(x3 - 10, row1Y, knobSize + 20, 20);
-    saturationSlider.setBounds(x3, row1Y + 20, knobSize, knobSize);
-
-    // --- ROW 2: Wow | Flutter | Bass | Treble ---
-    int row2Y = row1Y + knobSize + 20 + vSpacing;
-
-    wowLabel.setBounds(x1, row2Y, knobSize, 20);
-    wowSlider.setBounds(x1, row2Y + 20, knobSize, knobSize);
-
-    flutterLabel.setBounds(x2, row2Y, knobSize, 20);
-    flutterSlider.setBounds(x2, row2Y + 20, knobSize, knobSize);
-
-    bassLabel.setBounds(x3, row2Y, knobSize, 20);
-    bassSlider.setBounds(x3, row2Y + 20, knobSize, knobSize);
-
-    trebleLabel.setBounds(x4, row2Y, knobSize, 20);
-    trebleSlider.setBounds(x4, row2Y + 20, knobSize, knobSize);
+    // Grid Column 3 (Right): Treble, Bass, Master Mix
+    placeKnob(trebleLabel, trebleSlider, gridCol3);
+    placeKnob(bassLabel, bassSlider, gridCol3);
+    gridCol3.removeFromTop(10); // Extra gap before mix row
+    placeKnob(masterMixLabel, masterMixSlider, gridCol3);
 }
 
 void PluginEditor::timerCallback()
 {
-    // 0.95f is almost clipping (digital absolute zero is 1.0f)
     float currentPeak = processorRef.inputPeakLevel.load();
 
+    // 1. Drive the VU Meter (Smooth physics)
+    vuMeter.setLevel(currentPeak);
+    vuMeter.update();
+
+    // 2. Drive the Peak LED (Instant flash on clip)
     if (currentPeak >= 0.95f)
         ledDecay = 1.0f; // Flash bright!
     else

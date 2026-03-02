@@ -114,6 +114,76 @@ public:
     }
 };
 
+class AnalogVUMeter : public juce::Component
+{
+public:
+    void setLevel(float newLevel) {
+        // Feed the peak level in (0.0 to 1.0+)
+        targetLevel = juce::jlimit(0.0f, 1.2f, newLevel);
+    }
+
+    void update() {
+        // Needle Ballistics (Smooths the movement so it looks like physical mass)
+        if (currentLevel < targetLevel)
+            currentLevel += 0.15f * (targetLevel - currentLevel);
+        else
+            currentLevel -= 0.05f * (currentLevel - targetLevel);
+
+        repaint();
+    }
+
+    void paint(juce::Graphics& g) override {
+        auto bounds = getLocalBounds().toFloat();
+
+        // 1. Black Case
+        g.setColour(juce::Colour(0xff151515));
+        g.fillRoundedRectangle(bounds, 4.0f);
+        g.setColour(juce::Colours::grey);
+        g.drawRoundedRectangle(bounds, 4.0f, 2.0f);
+
+        // 2. Math for the Arc
+        float cx = bounds.getWidth() * 0.5f;
+        float cy = bounds.getHeight() * 0.9f;
+        float radius = bounds.getHeight() * 0.65f;
+
+        // 3. Draw Green & Orange Volume Blocks
+        juce::Path greenArc, orangeArc;
+        // Angles are in radians. -1.2 to 0.4 is the safe zone, 0.4 to 1.2 is peaking
+        greenArc.addCentredArc(cx, cy, radius, radius, 0.0f, -1.2f, 0.4f, true);
+        orangeArc.addCentredArc(cx, cy, radius, radius, 0.0f, 0.4f, 1.2f, true);
+
+        juce::PathStrokeType stroke(8.0f); // Thickness of the meter blocks
+        g.setColour(juce::Colour(0xff00cc00)); // Roland Green
+        g.strokePath(greenArc, stroke);
+        g.setColour(juce::Colour(0xffff6600)); // Roland Orange
+        g.strokePath(orangeArc, stroke);
+
+        // 4. Text Overlay
+        g.setFont(juce::Font(18.0f, juce::Font::bold));
+        g.setColour(juce::Colour(0xff00aa00));
+        g.drawText("VU", bounds.withY(bounds.getHeight() * 0.45f), juce::Justification::centred, false);
+        g.setColour(juce::Colours::darkgrey);
+        g.setFont(12.0f);
+        g.drawText("Cosmic", bounds.withY(bounds.getHeight() * 0.65f), juce::Justification::centred, false);
+
+        // 5. Draw the Needle
+        float angle = juce::jmap(currentLevel, 0.0f, 1.0f, -1.2f, 1.2f);
+        juce::Path needle;
+        needle.addRectangle(-1.5f, -radius * 1.05f, 3.0f, radius * 1.05f);
+        needle.applyTransform(juce::AffineTransform::rotation(angle).translated(cx, cy));
+
+        g.setColour(juce::Colours::white);
+        g.fillPath(needle);
+
+        // Needle Pivot Pin
+        g.setColour(juce::Colours::silver);
+        g.fillEllipse(cx - 6.0f, cy - 6.0f, 12.0f, 12.0f);
+    }
+private:
+    float currentLevel = 0.0f;
+    float targetLevel = 0.0f;
+};
+
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor, public juce::Timer
 {
@@ -195,6 +265,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> syncRateAttachment;
 
+    AnalogVUMeter vuMeter;
     OverloadLED peakLed;
     float ledDecay = 0.0f;
 
