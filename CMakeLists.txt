@@ -21,12 +21,13 @@ add_subdirectory(modules/melatonin_inspector)
 juce_add_plugin(CTD201
         ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon.png"
         COMPANY_NAME "OrsonDev1"
-        BUNDLE_ID "com.CTD201.CTD201"
+        BUNDLE_ID "com.CTD201.CTD201
         COPY_PLUGIN_AFTER_BUILD TRUE
         PLUGIN_MANUFACTURER_CODE ORSO
         PLUGIN_CODE C201
-        FORMATS Standalone AU VST3 AUv3
+        FORMATS Standalone AU VST3 AUv3 AAX
         PRODUCT_NAME "Cosmic Tape Delay 201"
+        juce_set_aax_sdk_path(${PROJECT_NAME} "/Users/orsmith/SDKs/AAX_SDK")
 )
 
 # --- Binary Data ---
