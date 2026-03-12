@@ -192,7 +192,7 @@ void PluginEditor::paint(juce::Graphics& g)
     // 4. Title
     g.setColour(juce::Colours::black);
     g.setFont(24.0f);
-    g.drawText("Cosmic Tape Delay 201 Version 1.0.0", area.removeFromTop(40), juce::Justification::centred, false);
+    g.drawText("Cosmic Tape Delay 201 Version 1.0.2", area.removeFromTop(40), juce::Justification::centred, false);
 }
 
 void PluginEditor::resized()

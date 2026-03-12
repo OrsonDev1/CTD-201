@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.25)
-set(CURRENT_VERSION "0.9.0")
+set(CURRENT_VERSION "1.0.2")
 
 # This tells cmake we have goodies in the /cmake folder
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(PamplejuceVersion)
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
 
 # Project setup
 project(CTD201 VERSION ${CURRENT_VERSION})
@@ -28,6 +29,10 @@ juce_add_plugin(CTD201
         FORMATS Standalone AU VST3 AUv3 AAX
         PRODUCT_NAME "Cosmic Tape Delay 201"
         juce_set_aax_sdk_path(${PROJECT_NAME} "/Users/orsmith/SDKs/AAX_SDK")
+
+        AAX_CATEGORY AAX_ePlugInCategory_Delay
+        VST3_CATEGORIES Delay
+        AU_MAIN_TYPE aufx
 )
 
 # --- Binary Data ---
